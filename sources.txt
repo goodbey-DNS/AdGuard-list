@@ -1,0 +1,35 @@
+﻿#1Hosts (Xtra)
+https://adguardteam.github.io/HostlistsRegistry/assets/filter_70.txt
+#AdGuard DNS filter官方规则
+https://adguardteam.github.io/HostlistsRegistry/assets/filter_1.txt
+#秋风广告规则
+https://raw.githubusercontent.com/TG-Twilight/AWAvenue-Ads-Rule/main/AWAvenue-Ads-Rule.txt
+#秋风广告补充规则
+https://raw.githubusercontent.com/TG-Twilight/AWAvenue-Ads-Rule/main/Filters/AWAvenue-Ads-Rule-Replenish.txt
+#hagezi加强版
+https://cdn.jsdelivr.net/gh/hagezi/dns-blocklists@latest/adblock/ultimate.txt
+#OISD Blocklist Big
+https://adguardteam.github.io/HostlistsRegistry/assets/filter_27.txt
+CHN: AdRules DNS List
+https://raw.githubusercontent.com/Cats-Team/AdRules/main/dns.txt
+#anti-AD Filters
+https://anti-ad.net/easylist.txt
+https://anti-ad.net/adguard.txt
+#easylist中国
+https://easylist-downloads.adblockplus.org/easylistchina.txt
+#防止使用不支持安全搜索的搜索引擎
+https://cdn.jsdelivr.net/gh/hagezi/dns-blocklists@latest/adblock/nosafesearch.txt
+#防范已知的恶意顶级域
+https://cdn.jsdelivr.net/gh/hagezi/dns-blocklists@latest/adblock/spam-tlds.txt
+#ShadowWhisperer Tracking List
+https://adguardteam.github.io/HostlistsRegistry/assets/filter_69.txt
+#OPPO &红米手机追踪
+https://adguardteam.github.io/HostlistsRegistry/assets/filter_66.txt
+#HaGeZi's Xiaomi Tracker Blocklist
+https://adguardteam.github.io/HostlistsRegistry/assets/filter_60.txt
+#Scam Blocklist by DurableNapkin
+https://adguardteam.github.io/HostlistsRegistry/assets/filter_10.txt
+#Malicious URL Blocklist (URLHaus)
+https://adguardteam.github.io/HostlistsRegistry/assets/filter_11.txt
+# No Google
+https://adguardteam.github.io/HostlistsRegistry/assets/filter_37.txt

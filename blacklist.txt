@@ -1,0 +1,17 @@
+﻿||hagfish.yingt.fun^
+||api.yuntu.21cn.com^
+||mjmall.smartmidea.net^
+||app.ikeepfun.com^
+||virtual.uplus.com^
+||dp.push.dc.360.cn^
+||sdk.live.360.cn^
+||cloudcontrol.live.360.cn^
+||g-iot.live.360.cn^
+||youzan.com^
+||pathcf.prod.xtracloud.cn^
+||qcc.qualcomm.cn^
+||push-rtmp-hs-f5-xg.ixigua.com^
+||jsq.xunlei.com^
+||vip.xunlei.com^
+||pathcf.prod.xtracloud.cn^
+||api-pan.xunlei.com^
