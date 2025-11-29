@@ -26,10 +26,15 @@ class AdGuardRuleMerger:
     
     def __init__(self):
         self.network_rules: Set[str] = set()
+        self.custom_rules: Set[str] = set()  # ✅ 恢复：自定义黑名单
+        self.custom_exceptions: Set[str] = set()  # ✅ 恢复：自定义白名单
         self.stats: Dict[str, Any] = {
             'total_sources': 0, 'total_network_rules': 0, 'duplicate_rules': 0,
             'invalid_rules': 0, 'sources_processed': 0, 'failed_sources': [],
             'pruned_subdomain_rules': 0,
+            # ✅ 新增统计
+            'total_custom_rules': 0,
+            'total_custom_exceptions': 0,
         }
         self.lock = threading.Lock()
 
@@ -39,6 +44,12 @@ class AdGuardRuleMerger:
             return ""
         domain_part = rule.lstrip('|').split('^')[0]
         return f'||{domain_part}^' if domain_part else ""
+
+    # ✅ 精简：提取域名用于白名单匹配
+    def _extract_domain(self, rule: str) -> Optional[str]:
+        if rule.startswith('||') and rule.endswith('^'):
+            return rule.lstrip('|').split('^')[0]
+        return None
 
     def download_rules(self, url: str) -> Optional[str]:
         with requests.Session() as session:
@@ -67,114 +78,3 @@ class AdGuardRuleMerger:
             if len(line) > self.MAX_RULE_LENGTH:
                 local_stats['invalid'] += 1
                 continue
-            if not (line.startswith('||') and line.endswith('^')):
-                local_stats['invalid'] += 1
-                continue
-            rule = self.normalize_network_rule(line)
-            if not rule:
-                continue
-            with self.lock:
-                if rule in self.network_rules:
-                    local_stats['duplicate'] += 1
-                else:
-                    self.network_rules.add(rule)
-                    local_stats['network_rules'] += 1
-        with self.lock:
-            self.stats['duplicate_rules'] += local_stats['duplicate']
-            self.stats['invalid_rules'] += local_stats['invalid']
-            self.stats['total_network_rules'] += local_stats['network_rules']
-            self.stats['sources_processed'] += 1
-
-    def load_sources(self, file: str = 'sources.txt') -> List[str]:
-        for encoding in ('utf-8-sig', 'gbk', 'latin-1'):
-            try:
-                with open(file, encoding=encoding) as f:
-                    sources = [line.split('#')[0].strip() for line in f if line.strip() and not line.startswith('#')]
-                    valid_sources = [url for url in sources if urlparse(url).scheme in ('http', 'https')]
-                    self.stats['total_sources'] = len(valid_sources)
-                    logging.info(f"Loaded {len(valid_sources)} valid sources")
-                    return valid_sources
-            except (UnicodeDecodeError, FileNotFoundError):
-                continue
-        logging.error(f"Cannot read {file}")
-        return []
-
-    def prune_subdomain_rules(self):
-        if not self.network_rules:
-            return
-        def extract_domain(rule: str) -> str:
-            return rule.lstrip('|').split('^')[0]
-        all_domains = {extract_domain(r) for r in self.network_rules}
-        parent_domains = set()
-        for domain in all_domains:
-            parts = domain.split('.')
-            for i in range(1, len(parts)):
-                parent = '.'.join(parts[i:])
-                if parent in all_domains:
-                    parent_domains.add(parent)
-        kept_domains = all_domains - parent_domains
-        final_rules = {r for r in self.network_rules if extract_domain(r) in kept_domains}
-        self.stats['pruned_subdomain_rules'] = len(self.network_rules) - len(final_rules)
-        logging.info(f"Subdomain pruning complete: removed {self.stats['pruned_subdomain_rules']} parent rules")
-        self.network_rules = final_rules
-
-    def save_merged_rules(self, filename: str = 'adguard_rules.txt'):
-        with self.lock:
-            all_rules = list(self.network_rules)
-            self.stats['total_rules'] = len(all_rules)
-        
-        filepath = filename
-        
-        # ✅ 修复：拆分成多行，避免嵌套引号冲突
-        try:
-            tz = ZoneInfo('Asia/Shanghai')
-        except Exception:
-            tz = ZoneInfo('UTC')
-        now = datetime.now(tz)
-        
-        # ✅ 修复：分开写，消除复杂 f-string
-        with open(filepath, 'w', encoding='utf-8') as f:
-            f.write(f'! AdGuardHome Merged Rules - {now:%Y-%m-%d %H:%M:%S %Z}\n')
-            f.write(f'! Total: {len(all_rules)} | Pruned: {self.stats["pruned_subdomain_rules"]} | Duplicate: {self.stats["duplicate_rules"]} | Invalid: {self.stats["invalid_rules"]}\n!\n')
-            for rule in sorted(all_rules):
-                f.write(f'{rule}\n')
-        
-        logging.info(f"Saved: {filepath} ({len(all_rules)} rules)")
-
-    def run(self, sources_file: str = 'sources.txt', output_file: str = 'adguard_rules.txt'):
-        logging.info("=" * 50)
-        logging.info("AdGuardHome Rules Merge")
-        logging.info("=" * 50)
-        
-        sources = self.load_sources(sources_file)
-        if not sources:
-            logging.error("No sources found, exiting")
-            sys.exit(1)
-        
-        with ThreadPoolExecutor(max_workers=self.MAX_WORKERS) as executor:
-            future_to_url = {executor.submit(self.download_and_process, url): url for url in sources}
-            for future in as_completed(future_to_url):
-                future.result()
-        
-        if self.network_rules:
-            logging.info("Running subdomain pruning...")
-            self.prune_subdomain_rules()
-        
-        self.save_merged_rules(output_file)
-        logging.info("=" * 50)
-        logging.info("All tasks completed")
-        logging.info("=" * 50)
-
-    def download_and_process(self, url: str):
-        logging.info(f"Fetching: {url}")
-        content = self.download_rules(url)
-        if content:
-            self.process_rules(content)
-
-if __name__ == '__main__':
-    try:
-        merger = AdGuardRuleMerger()
-        merger.run()
-    except Exception as e:
-        logging.error(f"Fatal error: {e}")
-        sys.exit(1)
