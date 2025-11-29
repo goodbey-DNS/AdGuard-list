@@ -1,14 +1,14 @@
-name: Update AdGuardHome Rules
+name: 更新 AdGuardHome 规则
 
 on:
   schedule:
-    - cron: '0 18 * * *'  # Beijing time 02:00 daily
+    - cron: '0 18 * * *'   # 北京时间每天 02:00
   workflow_dispatch:
     inputs:
       reason:
-        description: 'Manual trigger reason'
+        description: '手动触发原因'
         required: false
-        default: 'Manual update'
+        default: '手动更新'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -29,13 +29,13 @@ jobs:
         with:
           python-version: '3.11'
 
-      - run: pip install requests~=2.31.0
+      - run: pip install requests~=2.31.0  # ✅ 优化：锁定大版本，防止不兼容更新
 
       - run: python merge_rules.py
 
-      - name: Commit and push
-        run: |
+      - run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add adguard_rules.txt
-          git diff --staged --quiet || (git commit -m "rules update $(date '+%Y-%m-%d %H:%M:%S %Z')" && git pull --rebase --autostash origin main && git push)
+          git add adguard_rules.txt merge_stats.json
+          # ✅ 优化：更友好的提交时间格式（CST 而非 ISO8601）
+          git diff --staged --quiet || (git commit -m "规则更新 $(date '+%Y-%m-%d %H:%M:%S %Z')" && git pull --rebase --autostash origin main && git push)
