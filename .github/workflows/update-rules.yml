@@ -31,7 +31,7 @@ jobs:
 
       - run: pip install requests~=2.31.0
 
-      - run: python merge_rules.py  # 无参数，默认行为
+      - run: python merge_rules.py
 
       - run: |
           git config user.name "github-actions[bot]"
