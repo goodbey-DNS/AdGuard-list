@@ -15,7 +15,7 @@ from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 from zoneinfo import ZoneInfo
 
-# 纯文本日志，兼容网页端
+# 纯文本日志，禁用颜色避免网页端乱码
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s')
 
 class AdGuardRuleMerger:
@@ -26,11 +26,10 @@ class AdGuardRuleMerger:
     
     def __init__(self):
         self.network_rules: Set[str] = set()
-        # 网页用户无需本地黑白名单
         self.stats: Dict[str, Any] = {
             'total_sources': 0, 'total_network_rules': 0, 'duplicate_rules': 0,
-            'invalid_rules': 0, 'sources_processed': 0, 'failed_sources': [],
-            'pruned_subdomain_rules': 0,
+            'invalid_rules': 0, 'sources_processed': 0, 'pruned_subdomain_rules': 0,
+            'failed_sources': [],  # 保留用于最后警告，但不生成文件
         }
         self.lock = threading.Lock()
 
@@ -42,20 +41,21 @@ class AdGuardRuleMerger:
         return f'||{domain_part}^' if domain_part else ""
 
     def download_rules(self, url: str) -> Optional[str]:
-        session = requests.Session()
-        retry = Retry(total=self.MAX_RETRIES, backoff_factor=2, status_forcelist=(429, 502, 503, 504))
-        session.mount("https://", HTTPAdapter(max_retries=retry))
-        session.mount("http://", HTTPAdapter(max_retries=retry))
-        try:
-            resp = session.get(url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=self.REQUEST_TIMEOUT)
-            resp.raise_for_status()
-            resp.encoding = resp.apparent_encoding
-            return resp.text
-        except Exception as e:
-            logging.error(f"[下载失败] {url}: {e}")
-            with self.lock:
-                self.stats['failed_sources'].append(url)
-            return None
+        # ✅ 细节：使用 with 确保 Session 正确关闭
+        with requests.Session() as session:
+            retry = Retry(total=self.MAX_RETRIES, backoff_factor=2, status_forcelist=(429, 502, 503, 504))
+            session.mount("https://", HTTPAdapter(max_retries=retry))
+            session.mount("http://", HTTPAdapter(max_retries=retry))
+            try:
+                resp = session.get(url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=self.REQUEST_TIMEOUT)
+                resp.raise_for_status()
+                resp.encoding = resp.apparent_encoding
+                return resp.text
+            except Exception as e:
+                logging.error(f"[下载失败] {url}: {e}")
+                with self.lock:
+                    self.stats['failed_sources'].append(url)
+                return None
 
     def process_rules(self, content: str):
         if not content:
@@ -100,7 +100,6 @@ class AdGuardRuleMerger:
         logging.error(f"无法读取 {file}")
         return []
 
-    # 默认开启剪枝（网页用户透明）
     def prune_subdomain_rules(self):
         if not self.network_rules:
             return
@@ -120,13 +119,12 @@ class AdGuardRuleMerger:
         logging.info(f"子域剪枝完成: 移除 {self.stats['pruned_subdomain_rules']} 条父域规则")
         self.network_rules = final_rules
 
-    # ✅ 最终调整：写回工作目录，网页用户通过Git下载
     def save_merged_rules(self, filename: str = 'adguard_rules.txt'):
         with self.lock:
             all_rules = list(self.network_rules)
             self.stats['total_rules'] = len(all_rules)
         
-        # ✅ 写在工作目录，Git提交后用户可在网页下载
+        # ✅ 修复问题1：写在工作目录，Git提交后网页下载
         filepath = filename
         
         try:
@@ -145,7 +143,7 @@ class AdGuardRuleMerger:
             f.writelines(content)
         
         logging.info(f"已保存: {filepath}（共 {len(all_rules)} 条规则）")
-        # 网页用户无需控制台打印，避免日志过长
+        # ✅ 修复问题2：移除 print，避免网页日志爆炸
 
     def run(self, sources_file: str = 'sources.txt', output_file: str = 'adguard_rules.txt'):
         logging.info("=" * 50)
@@ -162,7 +160,6 @@ class AdGuardRuleMerger:
             for future in as_completed(future_to_url):
                 future.result()
         
-        # 剪枝默认开启
         if self.network_rules:
             logging.info("正在执行子域剪枝...")
             self.prune_subdomain_rules()
@@ -178,7 +175,7 @@ class AdGuardRuleMerger:
         if content:
             self.process_rules(content)
 
-# 网页端通过 workflow_dispatch 触发，无需复杂CLI
+# 网页端无CLI交互，直接运行默认配置
 if __name__ == '__main__':
     try:
         merger = AdGuardRuleMerger()
