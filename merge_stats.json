@@ -1,18 +1,18 @@
 {
   "total_sources": 18,
-  "total_network_rules": 1367482,
-  "total_custom_rules": 17,
+  "total_network_rules": 1366908,
+  "total_custom_rules": 19,
   "total_custom_exceptions": 35,
-  "duplicate_rules": 605357,
-  "invalid_rules": 13272,
+  "duplicate_rules": 605062,
+  "invalid_rules": 13267,
   "invalid_domains": 1167,
-  "invalid_length": 0,
+  "invalid_length": 5,
   "invalid_type": 0,
   "sources_processed": 18,
-  "pruned_subdomain_rules": 29740,
+  "pruned_subdomain_rules": 29784,
   "failed_sources": [],
-  "conflict_resolved": 7,
+  "conflict_resolved": 11,
   "network_whitelist_discarded": 0,
   "unicode_domains_discarded": 0,
-  "total_rules": 1337793
+  "total_rules": 1337177
 }
