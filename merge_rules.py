@@ -9,24 +9,23 @@ import json
 import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
-from typing import Set, List, Dict, Any, Optional  # ✅ 修复：添加 Optional
+from typing import Set, List, Dict, Any, Optional
 from urllib.parse import urlparse
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 from zoneinfo import ZoneInfo
 
-# 纯文本日志，兼容网页端
+# Logging config for GitHub Actions
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s')
 
 class AdGuardRuleMerger:
     REQUEST_TIMEOUT = (10, 30)
-    MAX_RETRIES = 1  # 失败当场重试1次
-    MAX_WORKERS = 8  # Actions 2核安全并发
+    MAX_RETRIES = 1
+    MAX_WORKERS = 8
     MAX_RULE_LENGTH = 1024
     
     def __init__(self):
         self.network_rules: Set[str] = set()
-        # 网页用户无需本地黑白名单
         self.stats: Dict[str, Any] = {
             'total_sources': 0, 'total_network_rules': 0, 'duplicate_rules': 0,
             'invalid_rules': 0, 'sources_processed': 0, 'failed_sources': [],
@@ -41,7 +40,7 @@ class AdGuardRuleMerger:
         domain_part = rule.lstrip('|').split('^')[0]
         return f'||{domain_part}^' if domain_part else ""
 
-    def download_rules(self, url: str) -> Optional[str]:  # ✅ 修复：Optional 已定义
+    def download_rules(self, url: str) -> Optional[str]:
         with requests.Session() as session:
             retry = Retry(total=self.MAX_RETRIES, backoff_factor=2, status_forcelist=(429, 502, 503, 504))
             session.mount("https://", HTTPAdapter(max_retries=retry))
@@ -52,7 +51,7 @@ class AdGuardRuleMerger:
                 resp.encoding = resp.apparent_encoding
                 return resp.text
             except Exception as e:
-                logging.error(f"[下载失败] {url}: {e}")
+                logging.error(f"[Download Failed] {url}: {e}")
                 with self.lock:
                     self.stats['failed_sources'].append(url)
                 return None
@@ -93,14 +92,13 @@ class AdGuardRuleMerger:
                     sources = [line.split('#')[0].strip() for line in f if line.strip() and not line.startswith('#')]
                     valid_sources = [url for url in sources if urlparse(url).scheme in ('http', 'https')]
                     self.stats['total_sources'] = len(valid_sources)
-                    logging.info(f"已加载 {len(valid_sources)} 个有效来源")
+                    logging.info(f"Loaded {len(valid_sources)} valid sources")
                     return valid_sources
             except (UnicodeDecodeError, FileNotFoundError):
                 continue
-        logging.error(f"无法读取 {file}")
+        logging.error(f"Cannot read {file}")
         return []
 
-    # 默认开启剪枝
     def prune_subdomain_rules(self):
         if not self.network_rules:
             return
@@ -117,18 +115,66 @@ class AdGuardRuleMerger:
         kept_domains = all_domains - parent_domains
         final_rules = {r for r in self.network_rules if extract_domain(r) in kept_domains}
         self.stats['pruned_subdomain_rules'] = len(self.network_rules) - len(final_rules)
-        logging.info(f"子域剪枝完成: 移除 {self.stats['pruned_subdomain_rules']} 条父域规则")
+        logging.info(f"Subdomain pruning complete: removed {self.stats['pruned_subdomain_rules']} parent rules")
         self.network_rules = final_rules
 
-    # 写回工作目录，Git提交后网页下载
     def save_merged_rules(self, filename: str = 'adguard_rules.txt'):
         with self.lock:
             all_rules = list(self.network_rules)
             self.stats['total_rules'] = len(all_rules)
         
-        filepath = filename  # 工作目录
+        filepath = filename
         
+        # ✅ 修复：拆分成多行，避免嵌套引号冲突
         try:
             tz = ZoneInfo('Asia/Shanghai')
-        except:
-            tz = ZoneInfo('
+        except Exception:
+            tz = ZoneInfo('UTC')
+        now = datetime.now(tz)
+        
+        # ✅ 修复：分开写，消除复杂 f-string
+        with open(filepath, 'w', encoding='utf-8') as f:
+            f.write(f'! AdGuardHome Merged Rules - {now:%Y-%m-%d %H:%M:%S %Z}\n')
+            f.write(f'! Total: {len(all_rules)} | Pruned: {self.stats["pruned_subdomain_rules"]} | Duplicate: {self.stats["duplicate_rules"]} | Invalid: {self.stats["invalid_rules"]}\n!\n')
+            for rule in sorted(all_rules):
+                f.write(f'{rule}\n')
+        
+        logging.info(f"Saved: {filepath} ({len(all_rules)} rules)")
+
+    def run(self, sources_file: str = 'sources.txt', output_file: str = 'adguard_rules.txt'):
+        logging.info("=" * 50)
+        logging.info("AdGuardHome Rules Merge")
+        logging.info("=" * 50)
+        
+        sources = self.load_sources(sources_file)
+        if not sources:
+            logging.error("No sources found, exiting")
+            sys.exit(1)
+        
+        with ThreadPoolExecutor(max_workers=self.MAX_WORKERS) as executor:
+            future_to_url = {executor.submit(self.download_and_process, url): url for url in sources}
+            for future in as_completed(future_to_url):
+                future.result()
+        
+        if self.network_rules:
+            logging.info("Running subdomain pruning...")
+            self.prune_subdomain_rules()
+        
+        self.save_merged_rules(output_file)
+        logging.info("=" * 50)
+        logging.info("All tasks completed")
+        logging.info("=" * 50)
+
+    def download_and_process(self, url: str):
+        logging.info(f"Fetching: {url}")
+        content = self.download_rules(url)
+        if content:
+            self.process_rules(content)
+
+if __name__ == '__main__':
+    try:
+        merger = AdGuardRuleMerger()
+        merger.run()
+    except Exception as e:
+        logging.error(f"Fatal error: {e}")
+        sys.exit(1)
