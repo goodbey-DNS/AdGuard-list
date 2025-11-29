@@ -29,13 +29,11 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Install dependencies
-        run: pip install requests~=2.31.0
+      - run: pip install requests~=2.31.0
 
-      - name: Run merge script
-        run: python merge_rules.py
+      - run: python merge_rules.py
 
-      - name: Commit and push if changed
+      - name: Commit and push
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
