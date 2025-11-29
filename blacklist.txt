@@ -1,4 +1,4 @@
-﻿||hagfish.yingt.fun^
+||hagfish.yingt.fun^
 ||api.yuntu.21cn.com^
 ||mjmall.smartmidea.net^
 ||app.ikeepfun.com^
@@ -10,8 +10,10 @@
 ||youzan.com^
 ||pathcf.prod.xtracloud.cn^
 ||qcc.qualcomm.cn^
-||push-rtmp-hs-f5-xg.ixigua.com^
+||ixigua.com^
 ||jsq.xunlei.com^
 ||vip.xunlei.com^
 ||pathcf.prod.xtracloud.cn^
 ||api-pan.xunlei.com^
+||flysleep.cn^$important
+||umeng.com^$important
